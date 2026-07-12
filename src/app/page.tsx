@@ -191,6 +191,7 @@ function normalizeStoredState(input: Partial<CatAppState> | null | undefined): C
     weeklyPlan: Array.isArray(input?.weeklyPlan) ? input.weeklyPlan : fallback.weeklyPlan,
     monthlyPlan: Array.isArray(input?.monthlyPlan) ? input.monthlyPlan : fallback.monthlyPlan,
     importantQuestions: Array.isArray(input?.importantQuestions) ? input.importantQuestions : fallback.importantQuestions,
+    importantLinks: Array.isArray(input?.importantLinks) ? input.importantLinks : [],
     revisionTopics: Array.isArray(input?.revisionTopics) ? input.revisionTopics : fallback.revisionTopics,
     activeView: input?.activeView ?? fallback.activeView,
   };
@@ -239,6 +240,7 @@ export default function Home() {
   });
   const [questionForm, setQuestionForm] = useState({ title: "", link: "", subject: "Quant" as SubjectKey, notes: "", imageUrl: "" });
   const [noteForm, setNoteForm] = useState({ title: "", content: "", tags: "", imageUrl: "" });
+  const [linkForm, setLinkForm] = useState({ title: "", url: "", subject: "Quant" as SubjectKey, notes: "" });
   const [revisionForm, setRevisionForm] = useState({ title: "", subject: "Quant" as SubjectKey, importance: "Medium" as RevisionTopic["importance"], notes: "", imageUrl: "" });
   const [noteQuery, setNoteQuery] = useState("");
   // Global filter controls used across several list views
@@ -608,6 +610,16 @@ export default function Home() {
       return `${item.title} ${item.notes}`.toLowerCase().includes(q);
     });
   }, [state.importantQuestions, globalQuery, filterSubject]);
+
+  const filteredImportantLinks = useMemo(() => {
+    const q = globalQuery.trim().toLowerCase();
+    const list = Array.isArray(state.importantLinks) ? state.importantLinks : [];
+    return list.filter((item) => {
+      if (filterSubject !== "All" && item.subject !== filterSubject) return false;
+      if (!q) return true;
+      return `${item.title} ${item.notes ?? ""} ${item.url}`.toLowerCase().includes(q);
+    });
+  }, [state.importantLinks, globalQuery, filterSubject]);
 
   const filteredTopics = useMemo(() => {
     const q = globalQuery.trim().toLowerCase();
@@ -1360,6 +1372,40 @@ export default function Home() {
                       <a href={question.link} target="_blank" rel="noreferrer" className="text-sm font-medium text-orange-600 hover:underline dark:text-orange-300">🔗 View question</a>
                       <span className="text-xs text-slate-500">Tap image to keep it handy.</span>
                     </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {activeView === "Important Links" && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70">
+            <div className="mb-4 flex items-center gap-3"><div className="rounded-2xl bg-indigo-100 p-2 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300"><Link2 size={18} /></div><div><p className="text-sm text-slate-500">Important links</p><h3 className="text-xl font-semibold">Save and access key resources</h3></div></div>
+            <form onSubmit={(e) => { e.preventDefault(); if (!linkForm.title.trim() || !linkForm.url.trim()) return; const link = { id: `link-${Date.now()}`, title: linkForm.title, url: linkForm.url, subject: linkForm.subject as SubjectKey, notes: linkForm.notes, createdAt: new Date().toISOString().slice(0,10) }; setState(prev => ({ ...prev, importantLinks: [link, ...(prev.importantLinks ?? [])] })); setLinkForm({ title: "", url: "", subject: "Quant", notes: "" }); }} className="mb-6 space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/60">
+              <input placeholder="Link title" value={linkForm.title} onChange={(event) => setLinkForm({ ...linkForm, title: event.target.value })} className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950" />
+              <input placeholder="https://..." value={linkForm.url} onChange={(event) => setLinkForm({ ...linkForm, url: event.target.value })} className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950" />
+              <select value={linkForm.subject} onChange={(event) => setLinkForm({ ...linkForm, subject: event.target.value as SubjectKey })} className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950"><option value="Quant">Quant</option><option value="LRDI">LRDI</option><option value="VARC">VARC</option></select>
+              <textarea placeholder="Notes (optional)" value={linkForm.notes} onChange={(event) => setLinkForm({ ...linkForm, notes: event.target.value })} className="min-h-20 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950" />
+              <button type="submit" className="flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-950"><PlusCircle size={16} /> Add link</button>
+            </form>
+            <div className="space-y-3">
+              {(state.importantLinks ?? []).length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500 dark:border-slate-700">No links yet. Add one above!</div>
+              ) : (
+                filteredImportantLinks.map((link) => (
+                  <div key={link.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
+                    <div className="mb-2 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold">{link.title}</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">{link.subject} • Added {link.createdAt}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <a href={link.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-orange-600 hover:underline dark:text-orange-300">Open</a>
+                        <button onClick={() => setState((prev) => ({ ...prev, importantLinks: (prev.importantLinks ?? []).filter((l) => l.id !== link.id) }))} className="text-red-500 hover:text-red-700">Delete</button>
+                      </div>
+                    </div>
+                    {link.notes && <p className="text-sm text-slate-600 dark:text-slate-400">{link.notes}</p>}
                   </div>
                 ))
               )}

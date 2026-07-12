@@ -1,5 +1,5 @@
 export type SubjectKey = "Quant" | "LRDI" | "VARC";
-export type ViewKey = "Dashboard" | "Today" | "Planner" | "History" | "Syllabus" | "Tracker" | "Important Questions" | "Revision" | "Notes" | "Calendar" | "Settings";
+export type ViewKey = "Dashboard" | "Today" | "Planner" | "History" | "Syllabus" | "Tracker" | "Important Questions" | "Important Links" | "Revision" | "Notes" | "Calendar" | "Settings";
 
 export interface TrackerChecklist {
   theory?: boolean;
@@ -100,6 +100,15 @@ export interface ImportantQuestion {
   imageUrl?: string;
 }
 
+export interface ImportantLink {
+  id: string;
+  title: string;
+  url: string;
+  subject: SubjectKey;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface NoteItem {
   id: string;
   title: string;
@@ -137,6 +146,7 @@ export interface CatAppState {
   weeklyPlan: WeeklySlot[];
   monthlyPlan: MonthlyGoalItem[];
   importantQuestions: ImportantQuestion[];
+  importantLinks: ImportantLink[];
   revisionTopics: RevisionTopic[];
   activeView: ViewKey;
 }
@@ -334,6 +344,7 @@ export function buildInitialState(): CatAppState {
     weeklyPlan: seedWeeklyPlan,
     monthlyPlan: seedMonthlyPlan,
     importantQuestions: [],
+    importantLinks: [],
     revisionTopics: seedRevisionTopics,
     activeView: "Dashboard",
   };
