@@ -302,6 +302,33 @@ export default function Home() {
         setState(buildInitialState());
       }
     }
+
+    // Detect existing Supabase session and set cloudUserId so auto-sync works
+    (async () => {
+      try {
+        if (isSupabaseConfigured()) {
+          const session = await supabase?.auth.getSession();
+          const userId = session?.data?.session?.user?.id ?? null;
+          if (userId) {
+            setCloudUserId(userId);
+            setAuthStatus("Signed in via session");
+            // Try to pull remote state and merge if present
+            try {
+              const remote = await loadStateFromSupabase(userId);
+              if (remote) {
+                const next = normalizeStoredState(remote);
+                setState(next);
+                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+              }
+            } catch (e) {
+              // ignore pull errors for now
+            }
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
   }, []);
 
   const clearAllData = () => {
@@ -336,6 +363,18 @@ export default function Home() {
           const nextState = normalizeStoredState(remoteState);
           setState(nextState);
           window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+        } else {
+          // No remote state — push local so other devices receive it
+          const local = window.localStorage.getItem(STORAGE_KEY);
+          if (local) {
+            try {
+              const parsed = normalizeStoredState(JSON.parse(local));
+              await syncStateToSupabase(data.user.id, parsed);
+              setSyncStatus("synced");
+            } catch (e) {
+              console.error("Failed to push local state after sign-in", e);
+            }
+          }
         }
       } catch (cloudError) {
         console.error(cloudError);
@@ -365,6 +404,17 @@ export default function Home() {
     if (data?.user) {
       setCloudUserId(data.user.id);
       setAuthStatus("Account created. Your planner will sync to the cloud.");
+      // After sign-up, if there is local data, push it to Supabase so other devices can fetch it
+      try {
+        const local = window.localStorage.getItem(STORAGE_KEY);
+        if (local) {
+          const parsed = normalizeStoredState(JSON.parse(local));
+          await syncStateToSupabase(data.user.id, parsed);
+          setSyncStatus("synced");
+        }
+      } catch (e) {
+        console.error("Post-signup sync failed", e);
+      }
     }
 
     setAuthPassword("");
@@ -389,6 +439,29 @@ export default function Home() {
     if (!mounted) return;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [mounted, state]);
+
+  // Auto-sync to Supabase when signed in. Debounced to avoid excessive writes.
+  useEffect(() => {
+    if (!mounted) return;
+    if (!cloudUserId) return;
+
+    let cancelled = false;
+    const id = window.setTimeout(async () => {
+      try {
+        setSyncStatus("syncing");
+        await syncStateToSupabase(cloudUserId, state);
+        if (!cancelled) setSyncStatus("synced");
+      } catch (e) {
+        console.error("Auto-sync failed", e);
+        if (!cancelled) setSyncStatus("error");
+      }
+    }, 1200);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+    };
+  }, [mounted, cloudUserId, state]);
 
   async function uploadImageViaApi(file: File) {
     return new Promise<string>((resolve, reject) => {
