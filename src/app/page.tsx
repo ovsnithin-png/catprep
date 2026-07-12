@@ -55,6 +55,7 @@ const viewOptions = [
   "Syllabus",
   "Tracker",
   "Important Questions",
+  "Important Links",
   "Revision",
   "Notes",
   "Calendar",
@@ -240,6 +241,10 @@ export default function Home() {
   const [noteForm, setNoteForm] = useState({ title: "", content: "", tags: "", imageUrl: "" });
   const [revisionForm, setRevisionForm] = useState({ title: "", subject: "Quant" as SubjectKey, importance: "Medium" as RevisionTopic["importance"], notes: "", imageUrl: "" });
   const [noteQuery, setNoteQuery] = useState("");
+  // Global filter controls used across several list views
+  const [globalQuery, setGlobalQuery] = useState("");
+  const [filterImportance, setFilterImportance] = useState<"All" | "High" | "Medium" | "Low">("All");
+  const [filterSubject, setFilterSubject] = useState<"All" | SubjectKey>("All");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [taskDraft, setTaskDraft] = useState({ title: "", subject: "Quant" as SubjectKey, estimate: "", notes: "" });
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
@@ -583,6 +588,37 @@ export default function Home() {
     return notes.filter((note) => `${note.title} ${note.content} ${note.tags}`.toLowerCase().includes(query));
   }, [noteQuery, state.notes]);
 
+  const filteredRevision = useMemo(() => {
+    const q = globalQuery.trim().toLowerCase();
+    const topics = Array.isArray(state.revisionTopics) ? state.revisionTopics : [];
+    return topics.filter((t) => {
+      if (filterImportance !== "All" && t.importance !== filterImportance) return false;
+      if (filterSubject !== "All" && t.subject !== filterSubject) return false;
+      if (!q) return true;
+      return `${t.title} ${t.notes}`.toLowerCase().includes(q);
+    });
+  }, [state.revisionTopics, globalQuery, filterImportance, filterSubject]);
+
+  const filteredImportantQuestions = useMemo(() => {
+    const q = globalQuery.trim().toLowerCase();
+    const list = Array.isArray(state.importantQuestions) ? state.importantQuestions : [];
+    return list.filter((item) => {
+      if (filterSubject !== "All" && item.subject !== filterSubject) return false;
+      if (!q) return true;
+      return `${item.title} ${item.notes}`.toLowerCase().includes(q);
+    });
+  }, [state.importantQuestions, globalQuery, filterSubject]);
+
+  const filteredTopics = useMemo(() => {
+    const q = globalQuery.trim().toLowerCase();
+    const list = Array.isArray(state.topics) ? state.topics : [];
+    return list.filter((item) => {
+      if (filterSubject !== "All" && item.subject !== filterSubject) return false;
+      if (!q) return true;
+      return `${item.name} ${item.notes}`.toLowerCase().includes(q);
+    });
+  }, [state.topics, globalQuery, filterSubject]);
+
   const activeView = state.activeView as ViewOption;
   const setView = (view: ViewOption) => setState((prev) => ({ ...prev, activeView: view }));
   const profile = state.profile ?? buildInitialState().profile;
@@ -867,6 +903,25 @@ export default function Home() {
         <div className="rounded-3xl border border-white/70 bg-white/80 px-6 py-5 text-center shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70">
           <p className="text-sm font-semibold uppercase tracking-[0.32em] text-orange-500">CAT OS</p>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Loading your study dashboard…</p>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-3 text-slate-400" />
+            <input placeholder="Filter / search across lists..." value={globalQuery} onChange={(e) => setGlobalQuery(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-sm dark:border-slate-800 dark:bg-slate-950" />
+          </div>
+          <select value={filterImportance} onChange={(e) => setFilterImportance(e.target.value as any)} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950">
+            <option value="All">All importance</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+          <select value={filterSubject} onChange={(e) => setFilterSubject(e.target.value as any)} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950">
+            <option value="All">All subjects</option>
+            <option value="Quant">Quant</option>
+            <option value="LRDI">LRDI</option>
+            <option value="VARC">VARC</option>
+          </select>
         </div>
       </div>
     );
@@ -1290,7 +1345,7 @@ export default function Home() {
               {state.importantQuestions.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500 dark:border-slate-700">No questions added yet. Add your first important question above!</div>
               ) : (
-                state.importantQuestions.map((question) => (
+                filteredImportantQuestions.map((question) => (
                   <div key={question.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
                     <div className="mb-2 flex items-start justify-between gap-3">
                       <div>
@@ -1323,7 +1378,7 @@ export default function Home() {
                     <span className="text-xs text-slate-500">{state.topics.length} topics</span>
                   </div>
                   <div className="mt-3 space-y-3">
-                    {state.topics.length === 0 ? <p className="text-sm text-slate-500">No syllabus topics yet.</p> : state.topics.map((topic) => (
+                    {state.topics.length === 0 ? <p className="text-sm text-slate-500">No syllabus topics yet.</p> : filteredTopics.map((topic) => (
                       <div key={topic.id} className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
                         <div className="flex items-start justify-between gap-2">
                           <div>
@@ -1352,7 +1407,7 @@ export default function Home() {
                     <span className="text-xs text-slate-500">{state.revisionTopics.length} topics</span>
                   </div>
                   <div className="mt-3 space-y-3">
-                    {state.revisionTopics.length === 0 ? <p className="text-sm text-slate-500">No revision topics yet.</p> : state.revisionTopics.map((topic) => (
+                    {state.revisionTopics.length === 0 ? <p className="text-sm text-slate-500">No revision topics yet.</p> : filteredRevision.map((topic) => (
                       <div key={topic.id} className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
                         <div className="flex items-start justify-between gap-2">
                           <div>
@@ -1395,7 +1450,7 @@ export default function Home() {
               {state.revisionTopics.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500 dark:border-slate-700">No revision topics yet. Add your first topic above!</div>
               ) : (
-                state.revisionTopics.map((topic) => (
+                filteredRevision.map((topic) => (
                   <div key={topic.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
                     <div className="mb-2 flex items-start justify-between gap-3">
                       <div>
